@@ -16,6 +16,12 @@ on:
 
 permissions:
   contents: write
+  # `actions: write` is what lets the last step dispatch deploy.yml. Without it
+  # the dispatch fails with HTTP 403 AFTER the data has already been committed —
+  # so the data job goes red for a reason unrelated to the data, or worse, if the
+  # step is made non-fatal, the commit lands and the live site silently never
+  # updates. A push made with GITHUB_TOKEN does not trigger another workflow.
+  actions: write
 
 concurrency:
   group: data-pipeline
