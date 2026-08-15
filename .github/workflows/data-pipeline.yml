@@ -1,0 +1,63 @@
+name: Data Pipeline
+
+on:
+  schedule:
+    # The ACMA rebuilds the register DAILY, but this site answers structural
+    # questions about the whole register — who holds what, band by band — and
+    # those move on the scale of auctions and machinery-of-government changes,
+    # not overnight. Monthly is the fastest cadence the factory allows for a
+    # non-realtime explorer, and it is also the polite one: each run pulls a
+    # 60 MB archive from the ACMA's CDN.
+    - cron: '23 17 6 * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['pipeline/**']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # `npm install`, not `npm ci`: the pipeline's only dependency is mapshaper
+      # and a lockfile drift there should not fail the data run.
+      - run: cd pipeline && npm install --no-audit --no-fund
+      - run: node --max-old-space-size=8192 pipeline/collect.mjs
+      # aggregate.mjs exits non-zero if any correctness gate fails, so a change
+      # in the register's shape stops the run rather than publishing a wrong
+      # number quietly.
+      - run: node --max-old-space-size=8192 pipeline/aggregate.mjs
+      - run: npm ci && npm test
+
+      - name: Commit data
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "Update register data $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A push made with GITHUB_TOKEN does NOT trigger another workflow, so the
+      # data commit lands, this job goes green, and the live site never changes.
+      # Dispatch the deploy explicitly.
+      - name: Deploy the new data
+        if: steps.commit.outputs.changed == 'true'
+        run: gh workflow run deploy.yml --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
