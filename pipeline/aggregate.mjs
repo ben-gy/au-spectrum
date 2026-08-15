@@ -187,14 +187,14 @@ gate('G14a sites with usable coordinates', sites.filter((s) => Number.isFinite(+
 // ─────────────────────────────────────────────────────────────────────────────
 
 say('streaming device_details.csv');
-const bandAgg = BANDS.map(() => ({ rows: 0, tx: 0, lics: new Set(), roots: new Set(), byClass: new Map(), rawCn: new Set(), keys: new Set() }));
+const bandAgg = BANDS.map(() => ({ rows: 0, tx: 0, lics: new Set(), roots: new Set(), byClass: new Map(), byEntity: new Map(), keys: new Set() }));
 const binAgg = Array.from({ length: BIN_COUNT }, () => ({ rows: 0, tx: 0, byClass: new Map(), roots: new Set() }));
 const freqAgg = new Map(); // hz -> { rows, tx, lics:Set }
 const svcRows = new Map();
 const stationClassRows = new Map();
 const authYear = { apparatus: new Map(), spectrum: new Map() };
 const fixedGroups = new Map(); // `${lic}|${site}` -> { t:[], r:[] }
-let deviceRows = 0, txRows = 0, txRowsGranted = 0, noFreq = 0, blankSite = 0, thzRows = 0;
+let deviceRows = 0, txRows = 0, rxRows = 0, txRowsGranted = 0, noFreq = 0, blankSite = 0, thzRows = 0;
 let devRowsGranted = 0;
 const assignmentKeys = new Set();
 const bump = (m, k, n = 1) => m.set(k, (m.get(k) || 0) + n);
@@ -205,6 +205,7 @@ const streamStats = await streamCsv(TMP + 'device_details.csv', (r) => {
   if (!li) return; // gated below; never silently dropped
   const isTx = r.DEVICE_TYPE === 'T';
   if (isTx) txRows++;
+  if (r.DEVICE_TYPE === 'R') rxRows++;
   if (li.granted) {
     devRowsGranted++;
     if (isTx) txRowsGranted++;
@@ -232,6 +233,11 @@ const streamStats = await streamCsv(TMP + 'device_details.csv', (r) => {
       // rows reverses the true ordering.
       b.keys.add(`${r.LICENCE_NO}|${r.SITE_ID}|${r.FREQUENCY}|${r.DEVICE_TYPE}`);
       bump(b.byClass, li.cls);
+      // Per-band, per-entity rows, counted here rather than reconstructed later
+      // from each licence's whole-register total — a licence that touches four
+      // bands would otherwise be credited with all of its rows in every one of
+      // them, which published three "share of band" figures above 100%.
+      bump(b.byEntity, li.root);
     }
     const bn = binOf(f);
     if (bn >= 0) {
@@ -472,13 +478,7 @@ const bandsJson = {
   })).filter((b) => b.rows > 0),
 };
 function topEntities(agg, n) {
-  const counts = new Map();
-  for (const l of agg.lics) {
-    const li = licInfo.get(l);
-    if (!li) continue;
-    bump(counts, li.root, rowsPerLic.get(l) || 0);
-  }
-  return [...counts.entries()]
+  return [...agg.byEntity.entries()]
     .filter(([root]) => !entity.get(root).person)
     .sort((a, b) => b[1] - a[1]).slice(0, n)
     .map(([root, rows]) => [entIndex.get(root) ?? -1, rows]);
@@ -669,7 +669,8 @@ for (const r of specFreq) {
 }
 const spectrumJson = {
   attribution: ATTRIBUTION,
-  note: 'MHz held in one named market. Never summed across markets — the same block licensed in 32 places is 2,500 MHz held, not 80,000.',
+  note: 'MHz held in one named market. Never summed across markets — the same block licensed in many places is held once, not once per place.',
+  licences: specLicences.length,
   bandNames: BANDS.map((b) => b.name),
   rows: [...marketRows.values()].map((m) => ({
     market: m.market, band: m.band, entity: m.entity,
@@ -682,9 +683,12 @@ const spectrumJson = {
 };
 function naiveVsUnion() {
   // The worked correction the site prints rather than hides: summing MHz across
-  // every area a licence covers counts the same megahertz once per market.
+  // every area a licence covers counts the same megahertz once per market. The
+  // area count travels with the figure so the interface can state the multiplier
+  // without hard-coding one that later stops matching.
   const naive = new Map();
   const union = new Map();
+  const areas = new Map();
   for (const r of specFreq) {
     const li = licInfo.get(r.LICENCE_NO);
     if (!li || !li.granted) continue;
@@ -693,6 +697,8 @@ function naiveVsUnion() {
     bump(naive, li.root, mhz);
     const key = `${li.root}|${r.AREA_CODE}`;
     union.set(key, (union.get(key) || 0) + mhz);
+    if (!areas.has(li.root)) areas.set(li.root, new Set());
+    areas.get(li.root).add(r.AREA_CODE);
   }
   const best = new Map();
   for (const [key, mhz] of union) {
@@ -703,6 +709,7 @@ function naiveVsUnion() {
     entity: entIndex.get(root) ?? -1,
     naive: Math.round(n),
     inOneMarket: Math.round(best.get(root) || 0),
+    areas: areas.get(root).size,
   }));
 }
 
@@ -728,6 +735,31 @@ const bslJson = {
   })),
 };
 
+// G8 — the ACMA's own documented join, measured rather than remembered.
+// The format doc says to join applic_text_block.LICENCE_NO to licence.LICENCE_NO.
+// That returns nothing at all: the column holds device registration identifiers.
+// A build that follows the documentation produces an empty table with no error,
+// which is why the site refuses to offer a per-licence conditions feature — and
+// why this is measured every run rather than asserted from a previous one.
+const conditions = readCsvRecords(TMP + 'applic_text_block.csv').records;
+const conditionKeys = new Set(conditions.map((r) => r.LICENCE_NO));
+const licenceNos = new Set(licences.map((l) => l.LICENCE_NO));
+let conditionDevMatches = 0;
+const conditionLicences = new Set();
+await streamCsv(TMP + 'device_details.csv', (r) => {
+  if (!r.DEVICE_REGISTRATION_IDENTIFIER) return;
+  if (conditionKeys.has(r.DEVICE_REGISTRATION_IDENTIFIER)) {
+    conditionDevMatches++;
+    conditionLicences.add(r.LICENCE_NO);
+  }
+});
+gate('G8a the documented conditions join returns nothing',
+  [...conditionKeys].filter((k) => licenceNos.has(k)).length, 0,
+  'if the ACMA repairs the column upstream this fires and a human decides');
+gate('G8b it matches device registration identifiers instead',
+  conditionDevMatches, conditionKeys.size);
+say(`conditions reach ${conditionLicences.size} licences of ${licences.length}`);
+
 // health.json — the register's own limits, and the forward expiry axis.
 const expiry = new Map();
 for (const l of licences) {
@@ -747,7 +779,10 @@ const healthJson = {
   snapshot: new Date().toISOString().slice(0, 10),
   bars: [
     { label: 'Site records with no device on them', n: sites.length - liveSites.length, of: sites.length, note: 'A site record is a coordinate in a catalogue, not a tower.' },
-    { label: 'Device rows that are receivers, not transmitters', n: deviceRows - txRows - noFreq, of: deviceRows, note: 'Each fixed link registers both ends. Receivers radiate nothing.' },
+    // Counted directly. `deviceRows − txRows − noFreq` happens to give the right
+    // answer today only because every frequency-less row also has a blank device
+    // type; it subtracts a frequency condition to remove a device-type one.
+    { label: 'Device rows that are receivers, not transmitters', n: rxRows, of: deviceRows, note: 'Each fixed link registers both ends. Receivers radiate nothing.' },
     { label: 'Device rows belonging to just 398 spectrum licences', n: svcRows.get('85') || 0, of: deviceRows, note: '0.24% of the register carries 78% of the hardware.' },
     { label: 'Clients with no industry category recorded', n: clients.filter((c) => !c.CAT_ID).length, of: clients.length, note: 'And the "Safety Services" category is defined but used by nobody at all.' },
     // `issued` is a Map. Reading it with property syntax returns undefined and
@@ -756,6 +791,12 @@ const healthJson = {
     { label: 'Licences stamped with this year’s issue date', n: issued.get(String(new Date().getFullYear())) ?? 0, of: licences.length, note: 'Renewal rewrites the issue date. Nothing in the file predates September 2014.' },
     { label: 'Sites whose position is recorded as “unknown” accuracy', n: sites.filter((s) => s.SITE_PRECISION !== 'Within 10 metres' && s.SITE_PRECISION !== 'Within 100 metres').length, of: sites.length, note: 'Never drawn at the same weight as a ten-metre fix.' },
   ],
+  conditions: {
+    texts: conditions.length,
+    keys: conditionKeys.size,
+    licencesReached: conditionLicences.size,
+    documentedJoinMatches: 0,
+  },
   expiry: Object.fromEntries([...expiry].sort()),
   issued: Object.fromEntries([...issued].sort()),
   authApparatus: Object.fromEntries([...authYear.apparatus].sort()),
@@ -854,6 +895,15 @@ gate('G9c person-only names surviving via a co-located public structure',
 const personNames = new Set(clients.filter((c) => personClient.get(c.CLIENT_NO)).map((c) => c.LICENCEE.trim()).filter((n) => n.length > 4));
 const entityNames = entitiesJson.rows.map((r) => r[0]);
 gate('G10a no natural person is named in entities.json', entityNames.filter((n) => personNames.has(n.trim())).length, 0);
+// G10b — the roster is the obvious place to check and the easy place to pass.
+// Site names are the other place a person's name can reach the page, and they
+// are not derived from client.csv at all, so nothing else would catch it. A
+// register site name may legitimately CONTAIN a personal-looking token (a street
+// named after somebody), so this asserts on whole-string equality, which is the
+// form that would mean a licensee's name had been published as a place.
+const shippedNameSet = new Set(siteNamesJson.names.map((n) => n.trim().toUpperCase()));
+gate('G10b no natural person is named in the shipped site names',
+  [...personNames].filter((n) => shippedNameSet.has(n.trim().toUpperCase())).length, 0);
 
 // G16: one id space.
 const maxId = entitiesJson.rows.length - 1;
@@ -864,6 +914,13 @@ const refs = [
   ...spectrumJson.rows.map((r) => r.entity),
 ];
 gate('G16 every entity reference resolves in entities.json', refs.filter((i) => i > maxId || i < -1).length, 0);
+// G18 — a holder cannot hold more of a band than the band contains. This is the
+// arithmetic that a whole-register row count credited to every band it touches
+// silently violates, and the interface renders it as a percentage.
+gate('G18 no band credits a holder with more rows than the band has',
+  bandsJson.bands.filter((b) => b.topHolders.some(([, rows]) => rows > b.rows)).length, 0);
+gate('G18b every band’s holder rows sum to at most the band’s rows',
+  bandsJson.bands.filter((b) => sumBy(b.topHolders, ([, rows]) => rows) > b.rows).length, 0);
 
 // Plausibility
 plausible('P1 spectrum-licence share of device rows (%)', Math.round(((svcRows.get('85') || 0) / deviceRows) * 10000) / 100, 78, 79);
@@ -902,6 +959,11 @@ for (const [name, data] of Object.entries(files)) {
   writeFileSync(OUT + name, body);
   console.log(`  ${name.padEnd(18)} ${(Buffer.byteLength(body) / 1024).toFixed(0)} KB`);
 }
+// The boundary file is written outside the loop above, so it would otherwise be
+// the one payload with no attribution on it — and it is the one payload whose
+// content is somebody else's.
+sa4Simple.attribution = 'Statistical Area Level 4 boundaries © Australian Bureau of Statistics, licensed CC BY 4.0';
+sa4Simple.note = ATTRIBUTION + ' (for the register; the boundaries are the ABS\'s and are separately licensed)';
 writeFileSync(OUT + 'sa4.geojson', JSON.stringify(sa4Simple));
 console.log(`  sa4.geojson        ${(Buffer.byteLength(JSON.stringify(sa4Simple)) / 1024).toFixed(0)} KB`);
 

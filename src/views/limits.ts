@@ -10,6 +10,7 @@ import { gloss } from '../glossary';
 interface HealthFile {
   snapshot: string;
   bars: { label: string; n: number; of: number; note: string }[];
+  conditions: { texts: number; keys: number; licencesReached: number; documentedJoinMatches: number };
   expiry: Record<string, number>;
   issued: Record<string, number>;
   authApparatus: Record<string, number>;
@@ -54,7 +55,7 @@ export async function renderLimits(host: HTMLElement): Promise<void> {
       </div>
 
       ${panel('One real time axis, and its confound',
-    `Device assignments keep the date they were first authorised, even through licence renewal — so the register does hold a genuine ${gloss('apparatus vintage', 'vintage curve')}, back to 1959. But 78% of device rows belong to spectrum licences that carriers re-lodge in bulk, so the two populations are drawn separately and never summed.`,
+    `Device assignments keep the date they were first authorised, even through licence renewal — so the register does hold a genuine ${gloss('apparatus vintage', 'vintage curve')}, reaching back further than any other column in the file. But most device rows belong to spectrum licences that carriers re-lodge in bulk, so the two populations are drawn separately and never summed.`,
     `<div id="vintage"></div>
      <div class="legend-note">Both curves are survivorship: they show assignments still authorised today, not everything ever authorised. A 1962 assignment on this chart is a link that has been continuously licensed for sixty-four years.</div>`)}
     `;
@@ -93,10 +94,11 @@ function drawBars(host: HTMLElement, h: HealthFile): void {
       </div>
       <div style="margin-top:var(--space-md)">
         <div style="display:flex;justify-content:space-between;gap:var(--space-md);flex-wrap:wrap"><span>Licences whose special conditions can be looked up, using the ACMA's own documented join</span>
-        <span class="mono">74 of 164,105</span></div>
-        <div class="note-inline">The documented join returns nothing at all: the column named LICENCE_NO in the conditions
-          table holds device registration identifiers, and matches 7,344 of them — reaching 0.05% of the register. There is no
-          per-licence conditions feature on this site because there cannot be one.</div>
+        <span class="mono">${num(h.conditions.licencesReached)} of ${num(h.totals.licences)}</span></div>
+        <div class="note-inline">The documented join returns <strong>${num(h.conditions.documentedJoinMatches)}</strong> rows: the column named
+          LICENCE_NO in the conditions table holds device registration identifiers instead, and matches
+          ${num(h.conditions.keys)} of them — reaching ${pct((h.conditions.licencesReached / h.totals.licences) * 100, 2)} of the register.
+          There is no per-licence conditions feature on this site because there cannot be one.</div>
       </div>`;
 }
 
@@ -142,8 +144,14 @@ function drawYears(host: HTMLElement, sel: string, data: Record<string, number>,
 function drawVintage(host: HTMLElement, h: HealthFile): void {
   const el = host.querySelector('#vintage');
   if (!el) return;
+  // Derived from the data, not hard-stopped at this year — a fixed upper bound
+  // silently drops the newest year on the first rebuild after New Year's Day.
+  const seen = [...Object.keys(h.authApparatus), ...Object.keys(h.authSpectrum)]
+    .map(Number).filter((y) => Number.isFinite(y) && y >= 1900 && y <= 2100);
+  const from = Math.min(...seen);
+  const to = Math.max(...seen);
   const years: string[] = [];
-  for (let y = 1959; y <= 2026; y++) years.push(String(y));
+  for (let y = from; y <= to; y++) years.push(String(y));
   const app = years.map((y) => h.authApparatus[y] ?? 0);
   const spec = years.map((y) => h.authSpectrum[y] ?? 0);
   const w = 1120;
@@ -159,8 +167,8 @@ function drawVintage(host: HTMLElement, h: HealthFile): void {
   const line = (vals: number[]): string => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
 
   let svg = svgOpen(w, hgt);
-  for (let yr = 1960; yr <= 2020; yr += 10) {
-    const i = yr - 1959;
+  for (let yr = Math.ceil(from / 10) * 10; yr <= to; yr += 10) {
+    const i = yr - from;
     svg += `<line class="gridline" x1="${x(i).toFixed(1)}" y1="${padT}" x2="${x(i).toFixed(1)}" y2="${hgt - padB}"/>`
       + `<text class="mono" x="${x(i).toFixed(1)}" y="${hgt - padB + 15}" text-anchor="middle" font-size="10">${yr}</text>`;
   }
@@ -173,7 +181,7 @@ function drawVintage(host: HTMLElement, h: HealthFile): void {
   svg += `<line class="axis" x1="${padL}" y1="${hgt - padB}" x2="${w - 20}" y2="${hgt - padB}"/>`;
   svg += `<text class="mono" x="${padL - 6}" y="${padT + 8}" text-anchor="end" font-size="9">${compact(max)}</text>`;
   svg += `<text class="mono" x="${padL - 6}" y="${hgt - padB}" text-anchor="end" font-size="9">1</text>`;
-  svg += `<text x="${padL + 8}" y="${padT + 12}" font-size="10" fill="var(--accent-primary)">apparatus licences — the real vintage curve, back to 1959</text>`;
+  svg += `<text x="${padL + 8}" y="${padT + 12}" font-size="10" fill="var(--accent-primary)">apparatus licences — the real vintage curve, back to ${from}</text>`;
   svg += `<text x="${padL + 8}" y="${padT + 28}" font-size="10" fill="var(--accent-secondary)">spectrum licences — carrier bulk re-lodgement, not deployment</text>`;
   svg += `<text x="${w / 2}" y="${hgt - 8}" text-anchor="middle" font-size="10">device assignments still authorised today, by the year they were first authorised (log scale)</text></svg>`;
   el.innerHTML = svg;

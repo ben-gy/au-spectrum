@@ -39,6 +39,10 @@ const WANTED = new Set([
   'licence_service.csv', 'licence_subservice.csv', 'client_type.csv',
   'industry_cat.csv', 'licence_status.csv', 'class_of_station.csv',
   'nature_of_service.csv', 'licensing_area.csv', 'device_details.csv',
+  // Not used for any view — the ACMA's documented join for it returns zero rows.
+  // It is extracted so the pipeline can MEASURE that rather than assert it from
+  // memory, and so the gate fires if the ACMA ever repairs the column.
+  'applic_text_block.csv',
   'LICENCE.TXT',
 ]);
 

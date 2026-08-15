@@ -13,6 +13,8 @@ import { openOverlay } from '../components/overlay';
 
 type Metric = 'class' | 'percap' | 'concentration';
 let metric: Metric = 'percap';
+/** Top of the per-capita ramp, measured from the payload at load. */
+let perCapMax = 560;
 
 export async function renderWhere(host: HTMLElement): Promise<void> {
   try {
@@ -22,6 +24,7 @@ export async function renderWhere(host: HTMLElement): Promise<void> {
       load<GeoJSON.FeatureCollection>('sa4.geojson'),
     ]);
     const byCode = new Map(statsFile.rows.map((r) => [r.code, r]));
+    perCapMax = Math.max(1, ...statsFile.rows.map((r) => r.perTenK ?? 0));
     const topRegion = m.headline.sa4TopPerCapita;
     const bottom = m.headline.sa4BottomPerCapita;
 
@@ -206,7 +209,10 @@ function styleFor(s: Sa4Stat | undefined, classes: ClassDef[]): L.PathOptions {
   }
   const v = s.perTenK ?? 0;
   // A 37× spread needs a log ramp; linear renders 85 of 89 regions identical.
-  return { ...base, fillColor: ramp(Math.log10(1 + v) / Math.log10(1 + 560)) };
+  // The ceiling is measured from the data, not fixed — a hard-coded top clamps
+  // the highest region to the last colour and mislabels the legend the moment
+  // the register moves.
+  return { ...base, fillColor: ramp(Math.log10(1 + v) / Math.log10(1 + perCapMax)) };
 }
 
 const RAMP = ['#101a2b', '#16324f', '#1b5069', '#2b7180', '#4a9187', '#84b07d', '#c7cb6c', '#fde725'];
@@ -231,8 +237,13 @@ function drawLegend(host: HTMLElement, rows: Sa4Stat[], classes: ClassDef[]): vo
     el.innerHTML = [...used].map((c) => `<span class="legend-item"><span class="legend-swatch" style="background:${classColour(classes, c as string)}"></span>${esc(classLabel(classes, c as string))}</span>`).join('');
     return;
   }
+  // Legend breakpoints are the inverse of the ramp, computed from the same
+  // measured ceiling the fill uses, so the two cannot drift apart.
   const labels = metric === 'percap'
-    ? ['1', '4', '13', '38', '105', '250', '400', '560+']
+    ? RAMP.map((_, i) => {
+      const v = (1 + perCapMax) ** (i / (RAMP.length - 1)) - 1;
+      return i === RAMP.length - 1 ? `${Math.round(v)}+` : String(Math.round(v));
+    })
     : ['0%', '6%', '13%', '19%', '26%', '32%', '39%', '45%+'];
   el.innerHTML = RAMP.map((c, i) => `<span class="legend-item"><span class="legend-swatch" style="background:${c}"></span>${labels[i]}</span>`).join('')
     + `<span class="legend-item">${metric === 'percap' ? 'sites per 10,000 people (log scale)' : 'share of live sites held by the single largest holder'}</span>`;

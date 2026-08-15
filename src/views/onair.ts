@@ -109,12 +109,14 @@ function drawTimeline(host: HTMLElement, b: BslFile): void {
   const padB = 44;
   const padT = 20;
   const axisW = w - padL - undatedW - 40;
-  const y0 = 1920;
-  const y1 = 2027;
+  // Derived, so the axis does not silently clip the newest licences each January.
+  const yrs = dated.map((r) => Number(r.commenced!.slice(0, 4))).filter(Number.isFinite);
+  const y0 = Math.floor(Math.min(...yrs, 1925) / 10) * 10;
+  const y1 = Math.max(...yrs, 2026) + 1;
   const x = (yr: number): number => padL + ((yr - y0) / (y1 - y0)) * axisW;
 
   let svg = svgOpen(w, h);
-  for (let yr = 1920; yr <= 2020; yr += 10) {
+  for (let yr = y0; yr <= y1 - 5; yr += 10) {
     svg += `<line class="gridline" x1="${x(yr).toFixed(1)}" y1="${padT}" x2="${x(yr).toFixed(1)}" y2="${h - padB}"/>`
       + `<text class="mono" x="${x(yr).toFixed(1)}" y="${h - padB + 16}" text-anchor="middle" font-size="10">${yr}</text>`;
   }

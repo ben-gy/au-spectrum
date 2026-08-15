@@ -66,6 +66,17 @@ describe('the natural-person test', () => {
     expect(isNaturalPerson(person({ LICENCEE: 'GE Hawgood' }), 3)).toBe(true);
   });
 
+  it('catches a three-way joined name, not just a two-way one', () => {
+    // `halves.every(bareNameShape)` hands Array.every's INDEX to the second
+    // parameter, so the third part of a three-way name silently required two
+    // words. Seven families were published by name and five of their farms
+    // appeared on the map, with every gate green.
+    for (const n of ['Gallinagh VP & SD & Co', 'Sutherland F & E & Sons',
+      'D & A VERRALL & SON', 'R J & V M HATHWAY & SON']) {
+      expect(looksPersonal(n)).toBe(true);
+    }
+  });
+
   it('catches a joined partnership — two people, not an organisation', () => {
     // These are the commonest way a farm or a household appears in the register,
     // and they slipped through an earlier rule because "&" normalises to " AND "

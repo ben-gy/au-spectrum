@@ -93,7 +93,8 @@ export async function renderMethod(host: HTMLElement): Promise<void> {
     <p class="panel-sub">The cost is stated rather than hidden: the second arm also catches a few hundred very small holders that
       may be businesses rather than people, and folds them into the aggregate. That is roughly 0.3% of the register losing its name
       and no analysis at all. In the other direction, a sole trader registered as a company is indistinguishable from the record
-      alone — which is why there is no name search box on this site, and will not be.</p>`)}
+      alone — which is why there is no licensee-name search on this site, and will not be. (The Where view's search box
+      matches the register's <em>site</em> names, which are places, not people.)</p>`)}
 
       ${panel('Time',
     'One axis in this register is honest. Three are not, and the site refuses all three.',

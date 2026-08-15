@@ -86,7 +86,7 @@ async function showAbout(): Promise<void> {
     <p>It is deliberately not another licence lookup. The ACMA's own search, the Offline RRL,
       SpectAura and maprad.io all do per-record lookup well, and this site links to them. What none
       of them does is answer questions about the register itself: how concentrated it is, which bands
-      belong to the public and which to four companies, whose mast everyone else shares.</p>
+      belong to the public and which to four companies, and whose site everyone else shares.</p>
 
     <h3>What the data is</h3>
     <p>The full bulk extract, rebuilt by the ACMA daily and fetched by an automated pipeline:

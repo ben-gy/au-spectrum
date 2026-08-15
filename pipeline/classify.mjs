@@ -113,7 +113,11 @@ export function looksPersonal(name) {
   // them through with their names and their address-named sites published.
   if (/ AND /.test(n)) {
     const halves = n.split(' AND ');
-    return halves.length <= 3 && halves.every(bareNameShape);
+    // Note the arrow function. Passing `bareNameShape` directly hands
+    // Array.every's INDEX to the second parameter, so the third part of a
+    // three-way name silently needs two words — which published seven families
+    // by name and five of their farms on the map, with every gate green.
+    return halves.length <= 3 && halves.every((h) => bareNameShape(h));
   }
   return bareNameShape(n, 2);
 }

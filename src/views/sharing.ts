@@ -7,6 +7,7 @@ import { num, pct, tipAttr, esc } from '../format';
 import { head, panel, stats, svgOpen } from './common';
 import { openHolder } from './holder-drawer';
 import { chordArcs, polar, type Arc } from '../utils/chord';
+import { gloss } from '../glossary';
 
 interface TenancyFile {
   pairs: Record<string, number>;
@@ -31,7 +32,7 @@ export async function renderSharing(host: HTMLElement): Promise<void> {
 
     host.innerHTML = `
       ${head('Sharing',
-    'Whose mast does everyone else share?',
+    `Whose ${gloss('site', 'site')} does everyone else share?`,
     `<strong>${esc(top.name)}</strong> carries equipment for <strong>${num(top.tenants.length)}</strong> separate organisations on <strong>${num(top.licences)}</strong> licences — the most contested piece of ground in the country. Nationally, <strong>${pct((t.shared / (t.shared + t.singleHolder)) * 100)}</strong> of sites with equipment on them have more than one organisation using them.`)}
 
       ${stats([
@@ -44,7 +45,9 @@ export async function renderSharing(host: HTMLElement): Promise<void> {
       ${panel('Who shares with whom',
     'Each arc is a kind of organisation, sized by how many shared sites it appears at. Each ribbon is a pair: its thickness is the number of sites where both kinds hold equipment. Click a ribbon to list those sites.',
     `<div id="chord" style="position:relative;max-width:840px;margin:0 auto"></div><div id="chord-legend" class="legend"></div>
-     <div class="legend-note">A loop back to the same arc means two organisations of the same kind sharing a site — two carriers on one tower, or two councils on one water tank.</div>`)}
+     <div class="legend-note">A loop back to the same arc means two organisations of the same kind at one site — two carriers, or two councils.
+       Throughout this view a "site" is the register's own site record, which is a coordinate in a catalogue rather than a structure:
+       several records can describe one mast, and 53 coordinates in the register carry more than one site number.</div>`)}
 
       ${panel('The most crowded ground in Australia',
     'Every site with six or more separate organisations on it. Each segment is one tenant, coloured by what kind of organisation it is. Click a segment for that organisation.',

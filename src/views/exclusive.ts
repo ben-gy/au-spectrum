@@ -10,8 +10,9 @@ import { openHolder } from './holder-drawer';
 
 interface SpectrumFile {
   bandNames: string[];
+  licences: number;
   rows: { market: string; band: number; entity: number; mhz: number; lower: number; upper: number; licences: number }[];
-  naive: { entity: number; naive: number; inOneMarket: number }[];
+  naive: { entity: number; naive: number; inOneMarket: number; areas: number }[];
 }
 
 let market = '';
@@ -37,7 +38,7 @@ export async function renderExclusive(host: HTMLElement): Promise<void> {
     host.innerHTML = `
       ${head('Exclusive',
     'Who owns a slab of spectrum over a place — and who is not a phone company?',
-    `A ${gloss('spectrum licence', 'spectrum licence')} is the kind auctions sell: a band, over an area, for up to fifteen years. There are only <strong>398</strong> in Australia. Counting them naively is the classic mistake — the same 2,500 MHz block licensed in 32 separate market areas looks like <strong>${num(worst.naive)} MHz</strong> and is <strong>${num(worst.inOneMarket)} MHz</strong>.`)}
+    `A ${gloss('spectrum licence', 'spectrum licence')} is the kind auctions sell: a band, over an area, for up to fifteen years. There are only <strong>${num(s.licences)}</strong> in Australia. Counting them naively is the classic mistake: add up every licence <strong>${esc(e.rows[worst.entity]?.name ?? 'the largest holder')}</strong> holds and you get <strong>${num(worst.naive)} MHz</strong>, because the same block licensed over ${worst.areas} separate market areas is counted once per area. What it actually holds in any one place is <strong>${num(worst.inOneMarket)} MHz</strong> — ${(worst.naive / Math.max(1, worst.inOneMarket)).toFixed(0)}× less.`)}
 
       ${stats([
     { value: '398', label: 'spectrum licences in Australia' },
