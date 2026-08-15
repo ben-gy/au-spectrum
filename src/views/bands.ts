@@ -38,7 +38,7 @@ export async function renderBands(host: HTMLElement): Promise<void> {
     host.innerHTML = `
       ${head('Bands',
     'Which frequencies belong to everybody, and which belong to four companies?',
-    `<strong>${num(lm.entities)}</strong> different organisations transmit in the 450–520 MHz land-mobile band — farms, taxis, mines, ambulances. In the 3.5 GHz band that carries 5G, there are <strong>${num(g5.entities)}</strong>. The 5G band carries nearly three times as much registered hardware.`)}
+    `<strong>${num(lm.entities)}</strong> organisations hold licences in the 450–520 MHz land-mobile band — farms, taxis, mines, ambulances. In the 3.5 GHz band that carries 5G, there are <strong>${num(g5.entities)}</strong>. And the sparser band is not the smaller one: strip out the duplicate paperwork a three-sector mobile site generates and land mobile holds <strong>${num(lm.assignments)}</strong> distinct assignments against 5G's <strong>${num(g5.assignments)}</strong>.`)}
 
       ${panel('The whole spectrum, from 10 kHz to 300 GHz',
     `Each column is a bin one twenty-fourth of a decade wide, so bins are equally wide on screen everywhere on the axis. Top: how much registered hardware sits there. Middle: who holds it. Bottom: how many separate organisations — the lane that tells you whether a band is a commons or a duopoly.`,
@@ -51,7 +51,7 @@ export async function renderBands(host: HTMLElement): Promise<void> {
     `The bands Australians actually name. "Holders" counts organisations after merging the register's client numbers; "device rows" counts registered assignments, about half of which are receivers. Click a row to see who is in it.`,
     `<div class="panel-scroll"><table id="bandTable"><thead><tr>
         <th>Band</th><th class="num">From</th><th class="num">To</th>
-        <th class="num">Device rows</th><th class="num">Licences</th><th class="num">Holders</th><th>Who holds it</th>
+        <th class="num">Device rows</th><th class="num">Assignments</th><th class="num">Licences</th><th class="num">Holders</th><th>Who holds it</th>
       </tr></thead><tbody></tbody></table></div>`)}
 
       <div id="band-detail"></div>
@@ -214,7 +214,9 @@ function renderTable(host: HTMLElement, f: BandsFile, classes: ClassDef[]): void
     return `<tr class="clickable" data-band="${f.bands.indexOf(b)}" data-i="${i}">
       <td>${esc(b.name)}</td>
       <td class="num">${freq(b.lo)}</td><td class="num">${b.hi ? freq(b.hi) : '—'}</td>
-      <td class="num">${num(b.rows)}</td><td class="num">${num(b.licences)}</td><td class="num">${num(b.entities)}</td>
+      <td class="num">${num(b.rows)}</td>
+      <td class="num" data-tip="${tipAttr(`${num(b.assignments)} distinct (licence, site, frequency, direction) assignments\n${num(b.rows)} device rows — ${(b.rows / Math.max(1, b.assignments)).toFixed(2)}× as many, because a multi-sector site registers one assignment several times`)}">${num(b.assignments)}</td>
+      <td class="num">${num(b.licences)}</td><td class="num">${num(b.entities)}</td>
       <td>${top.map(([cls, n]) => `<span data-tip="${tipAttr(`${classLabel(classes, cls)}: ${num(n)} device rows, ${pct((n / tot) * 100)}`)}"
         style="display:inline-block;width:${Math.max(6, (n / tot) * 90).toFixed(0)}px;height:10px;background:${classColour(classes, cls)};border-radius:2px;margin-right:2px"></span>`).join('')}</td>
     </tr>`;
@@ -235,8 +237,9 @@ function showBand(host: HTMLElement, f: BandsFile, classes: ClassDef[], idx: num
     detail.innerHTML = panel(`${esc(b.name)} — ${freq(b.lo)} to ${b.hi ? freq(b.hi) : '—'}`,
       esc(b.use),
       `<div class="stat-row">
-         <div class="stat"><div class="stat-value">${num(b.rows)}</div><div class="stat-label">device assignments</div></div>
-         <div class="stat"><div class="stat-value">${num(b.tx)}</div><div class="stat-label">of those, transmitters</div></div>
+         <div class="stat"><div class="stat-value">${num(b.rows)}</div><div class="stat-label">device rows</div></div>
+         <div class="stat"><div class="stat-value">${num(b.assignments)}</div><div class="stat-label">distinct assignments behind them</div></div>
+         <div class="stat"><div class="stat-value">${num(b.tx)}</div><div class="stat-label">rows that are transmitters</div></div>
          <div class="stat"><div class="stat-value">${num(b.licences)}</div><div class="stat-label">licences</div></div>
          <div class="stat"><div class="stat-value">${num(b.entities)}</div><div class="stat-label">organisations</div></div>
        </div>

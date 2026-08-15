@@ -137,7 +137,12 @@ for (const l of licences) {
   licInfo.set(l.LICENCE_NO, {
     root, cls: e.cls, sv: l.SV_ID, ss: l.SS_ID,
     granted: l.STATUS === GRANTED,
-    person: personClient.get(l.CLIENT_NO),
+    // ENTITY-level, not client-level. A trustee record can be un-flagged on its
+    // own and still merge into an entity the site treats as a natural person;
+    // keying the site suppression on the client flag published three of their
+    // sites — one of them a suburban residential address — while every
+    // client-level gate passed.
+    person: e.person,
     expiry: l.DATE_OF_EXPIRY,
     bsl: l.BSL_NO,
   });
@@ -182,7 +187,7 @@ gate('G14a sites with usable coordinates', sites.filter((s) => Number.isFinite(+
 // ─────────────────────────────────────────────────────────────────────────────
 
 say('streaming device_details.csv');
-const bandAgg = BANDS.map(() => ({ rows: 0, tx: 0, lics: new Set(), roots: new Set(), byClass: new Map(), rawCn: new Set() }));
+const bandAgg = BANDS.map(() => ({ rows: 0, tx: 0, lics: new Set(), roots: new Set(), byClass: new Map(), rawCn: new Set(), keys: new Set() }));
 const binAgg = Array.from({ length: BIN_COUNT }, () => ({ rows: 0, tx: 0, byClass: new Map(), roots: new Set() }));
 const freqAgg = new Map(); // hz -> { rows, tx, lics:Set }
 const svcRows = new Map();
@@ -221,7 +226,11 @@ const streamStats = await streamCsv(TMP + 'device_details.csv', (r) => {
       if (isTx) b.tx++;
       b.lics.add(r.LICENCE_NO);
       b.roots.add(li.root);
-      b.rawCn.add(li.root === undefined ? '' : r.LICENCE_NO); // replaced below
+      // Distinct assignments, not rows. A three-sector mobile site registers the
+      // same (licence, site, frequency, direction) three times, which inflates
+      // 3.5 GHz 5.3× and land mobile not at all — comparing the two bands on
+      // rows reverses the true ordering.
+      b.keys.add(`${r.LICENCE_NO}|${r.SITE_ID}|${r.FREQUENCY}|${r.DEVICE_TYPE}`);
       bump(b.byClass, li.cls);
     }
     const bn = binOf(f);
@@ -391,13 +400,22 @@ say(`publishable site points: ${publishable.length}`);
 // entities.json — the canonical id space.
 const nonPerson = [...entity.values()].filter((e) => !e.person).sort((a, b) => b.lic - a.lic);
 const entIndex = new Map(nonPerson.map((e, i) => [e.root, i]));
+// Counted at ENTITY level, not client level. Five licences sit on client records
+// that are not themselves person-flagged but that merge into a person-flagged
+// entity, so the client-level figure (4,895) leaves the site's own two published
+// numbers failing to sum to the register.
+const personEntities = [...entity.values()].filter((e) => e.person);
 const personAggregate = {
   clients: [...personClient.values()].filter(Boolean).length,
-  licences: personLicences,
-  devices: sumBy([...entity.values()].filter((e) => e.person), (e) => e.dev),
-  entities: [...entity.values()].filter((e) => e.person).length,
-  sites: sumBy([...entity.values()].filter((e) => e.person), (e) => e.sites.size),
+  licences: sumBy(personEntities, (e) => e.lic),
+  clientLevelLicences: personLicences,
+  devices: sumBy(personEntities, (e) => e.dev),
+  entities: personEntities.length,
+  sites: sumBy(personEntities, (e) => e.sites.size),
 };
+gate('G17 named licences plus withheld licences equal the register',
+  sumBy(nonPerson, (e) => e.lic) + personAggregate.licences, licences.length,
+  'the two figures the site publishes side by side must sum to the whole register');
 
 const SERVICE_ORDER = [...services.keys()];
 const entitiesJson = {
@@ -442,6 +460,7 @@ const bandsJson = {
   bands: BANDS.map((b, i) => ({
     name: b.name, lo: b.lo, hi: Number.isFinite(b.hi) ? b.hi : null, use: b.use,
     rows: bandAgg[i].rows, tx: bandAgg[i].tx,
+    assignments: bandAgg[i].keys.size,
     licences: bandAgg[i].lics.size,
     entities: bandAgg[i].roots.size,
     byClass: Object.fromEntries(bandAgg[i].byClass),
@@ -731,7 +750,10 @@ const healthJson = {
     { label: 'Device rows that are receivers, not transmitters', n: deviceRows - txRows - noFreq, of: deviceRows, note: 'Each fixed link registers both ends. Receivers radiate nothing.' },
     { label: 'Device rows belonging to just 398 spectrum licences', n: svcRows.get('85') || 0, of: deviceRows, note: '0.24% of the register carries 78% of the hardware.' },
     { label: 'Clients with no industry category recorded', n: clients.filter((c) => !c.CAT_ID).length, of: clients.length, note: 'And the "Safety Services" category is defined but used by nobody at all.' },
-    { label: 'Licences stamped with this year’s issue date', n: issued[String(new Date().getFullYear())] || issued['2026'] || 0, of: licences.length, note: 'Renewal rewrites the issue date. Nothing in the file predates September 2014.' },
+    // `issued` is a Map. Reading it with property syntax returns undefined and
+    // the bar silently publishes 0% where the true figure is 66% — the correct
+    // number sits two keys away in this same payload.
+    { label: 'Licences stamped with this year’s issue date', n: issued.get(String(new Date().getFullYear())) ?? 0, of: licences.length, note: 'Renewal rewrites the issue date. Nothing in the file predates September 2014.' },
     { label: 'Sites whose position is recorded as “unknown” accuracy', n: sites.filter((s) => s.SITE_PRECISION !== 'Within 10 metres' && s.SITE_PRECISION !== 'Within 100 metres').length, of: sites.length, note: 'Never drawn at the same weight as a ten-metre fix.' },
   ],
   expiry: Object.fromEntries([...expiry].sort()),
@@ -805,6 +827,13 @@ gate('G5b 450–520 MHz raw client numbers differ from merged', recount.lm.cns.s
   `${recount.lm.cns.size} client records vs ${recount.lm.roots.size} organisations`);
 gate('G5c 3.4–3.7 GHz merged holders, recomputed from source', recount.ghz.roots.size, band35.entities);
 gate('G5d 3.4–3.7 GHz holders is two orders of magnitude smaller', recount.lm.roots.size / recount.ghz.roots.size > 100, true);
+// The site contrasts these two bands' hardware. On raw device rows 3.5 GHz looks
+// 2.7× larger; on distinct assignments land mobile is larger, because a
+// three-sector mobile site registers one assignment three times. Assert the
+// inversion so nobody can quietly reword the headline back to rows.
+gate('G5e the two bands invert between rows and assignments',
+  band35.rows > band450.rows && band35.assignments < band450.assignments, true,
+  `rows ${band35.rows} vs ${band450.rows}; assignments ${band35.assignments} vs ${band450.assignments}`);
 
 // G9b: the suppression is verified against the shipped payload, by identity —
 // recompute the person-only set from the rule, then check the rows that were

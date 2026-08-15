@@ -5,7 +5,7 @@
 import L from 'leaflet';
 
 /**
- * A canvas layer for the 71,451 publishable transmitter sites.
+ * A canvas layer for the ~71,000 publishable transmitter sites.
  *
  * Leaflet markers are DOM nodes, and 71,000 of them is not a slow map, it is a
  * dead tab. Even `L.circleMarker` with the canvas renderer allocates a layer

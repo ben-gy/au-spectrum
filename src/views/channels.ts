@@ -52,7 +52,7 @@ export async function renderChannels(host: HTMLElement): Promise<void> {
     `<div id="arcs" class="panel-scroll"></div>`)}
 
       ${panel('The standard gaps',
-    'Every duplex spacing in the register, by how many paired links use it. Derived by grouping fixed-service devices by licence and site, sorting the transmit and receive frequencies, and pairing them in order — so the counts are ours, not the ACMA\'s.',
+    'Every duplex spacing in the register, by how many paired links use it. Derived by grouping fixed-service devices by licence and site, sorting the transmit and receive frequencies, and pairing them in order — so the counts are ours, not the ACMA\'s. 98% of the pairs come from groups holding exactly one transmit and one receive frequency, where the pairing is unambiguous; the handful of multi-link groups can produce a spacing that is an artefact of the ordering, so the length of this list is a property of our rule and the top of it is a property of the register.',
     `<div class="panel-scroll"><table id="dupTable"><thead><tr><th class="num">Spacing</th><th class="num">Paired links</th><th>Share</th></tr></thead><tbody></tbody></table></div>`)}
     `;
 

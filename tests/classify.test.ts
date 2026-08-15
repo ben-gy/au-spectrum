@@ -66,6 +66,24 @@ describe('the natural-person test', () => {
     expect(isNaturalPerson(person({ LICENCEE: 'GE Hawgood' }), 3)).toBe(true);
   });
 
+  it('catches a joined partnership — two people, not an organisation', () => {
+    // These are the commonest way a farm or a household appears in the register,
+    // and they slipped through an earlier rule because "&" normalises to " AND "
+    // and pushed the name past the word limit. 110 couples were published with
+    // their names and their address-named home sites before this was fixed.
+    for (const n of ['GW & DJ Lewis', 'D.R NETHERCOTE & J.A NETHERCOTE',
+      'MAX R & MERRYN HENKE', 'DOUGLAS J & ANTONIETTA M LEE', 'JA and FW Easter']) {
+      expect(looksPersonal(n)).toBe(true);
+    }
+  });
+
+  it('does not treat an organisation with "and" in its name as a couple', () => {
+    for (const n of ['SMITH AND JONES ENGINEERING', 'HEALTH AND SAFETY',
+      'ROADS AND MARITIME', 'SEARCH AND RESCUE', 'Department of Environment and Science']) {
+      expect(looksPersonal(n)).toBe(false);
+    }
+  });
+
   it('does not flag organisations that merely have short bare names', () => {
     // Every one of these was flagged by an earlier, unbounded version of the
     // rule, which deleted them from every league table on the site.

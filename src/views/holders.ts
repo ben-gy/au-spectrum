@@ -10,10 +10,10 @@ import { openHolder } from './holder-drawer';
 
 /**
  * A ranked bar chart would be the wrong instrument here. The datum is a
- * distribution with a Gini of 0.88 in which 59% of holders sit on exactly one
- * licence — the shape IS the finding, and a top-20 bar chart hides it by
- * showing only the head. So: a beeswarm on a log axis, one dot per organisation,
- * laned by what kind of organisation it is.
+ * distribution with a Gini of 0.88 in which nearly half of the named
+ * organisations sit on exactly one licence — the shape IS the finding, and a
+ * top-20 bar chart hides it by showing only the head. So: a beeswarm on a log
+ * axis, one dot per organisation, laned by what kind of organisation it is.
  */
 export async function renderHolders(host: HTMLElement): Promise<void> {
   try {

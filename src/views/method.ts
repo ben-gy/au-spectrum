@@ -52,6 +52,11 @@ export async function renderMethod(host: HTMLElement): Promise<void> {
         Infrastructure and Hamersley Iron remain three organisations, because no name or ABN rule joins them. Every ranking here is
         of <em>licensed entities</em>, not corporate parents — Rio Tinto is genuinely absent from the top of the table it would
         otherwise sit near.</li>
+      <li><strong>It occasionally merges two organisations that share a name.</strong> Central Coast Council in Tasmania and
+        Central Coast Council in New South Wales are 1,500 km apart and appear here as one holder; so do three state departments of
+        education. An audit of the register found roughly 200 licences — about 0.13% — caught this way, none of them in the top
+        fifty. The rule stays conservative rather than clever: adding a state test would break the many genuine organisations that
+        legitimately hold licences in several states.</li>
       <li><strong>It does not make licence counts comparable across licence types.</strong> Three of the holders in the ranking —
         Selectra, Interactive Telecommunications Network and Private Cable Network — hold hundreds of per-building subscription-TV
         <em>service</em> licences, not transmitters. Their licence counts are not like an apparatus licensee's.</li>
@@ -74,10 +79,12 @@ export async function renderMethod(host: HTMLElement): Promise<void> {
       ${panel('Natural persons',
     'Clause 8 of the ACMA\'s licence forbids reproducing a natural person\'s information. This is how that is implemented, and what it costs.',
     `<p class="panel-sub">A licensee is treated as a natural person if the register types them as one
-      (<span class="mono">CLIENT_TYPE_ID = 7</span>, ${num(2995)} clients), or if the name is unmistakably personal, the record carries no
+      (<span class="mono">CLIENT_TYPE_ID = 7</span>, 2,995 clients), or if the name is unmistakably personal, the record carries no
       ACN, and the holder has at most five licences. That second arm exists because individuals turn up filed as community groups —
       farm partnerships, hobbyists with a repeater — and it is bounded because an unbounded name-shape test flags Sydney Trains,
-      Monash Health and the Bureau of Meteorology as people and deletes them from every table on this site. Total flagged:
+      Monash Health and the Bureau of Meteorology as people and deletes them from every table on this site. It explicitly covers
+      <em>joined</em> names — "GW &amp; DJ Lewis", "J.M Johnston &amp; S.R Johnston" — which are two people and are the commonest way a
+      farm or a household appears in this register. Total flagged:
       <strong>${num(m.totals.personClients)}</strong> clients holding ${num(m.totals.personLicences)} licences, ${pct((m.totals.personLicences / m.totals.licences) * 100)} of the register.</p>
     <p class="panel-sub">For those licensees, nothing identifying is published: no name, no trading name, no ABN, no address, no
       client number, no vessel name. They appear only as one aggregate figure. <strong>And ${num(m.totals.personOnlySites)} sites are

@@ -20,11 +20,11 @@ organisations and which to a handful, whose mast everyone else shares, and how
 much of the file cannot support the question you want to ask it.
 
 The answers are frequently not what a reader expects. Australia's largest radio
-licensee is a fixed-broadband company. Government, emergency services and
-volunteers hold about 30% of the licences and 7% of the actual hardware. 398
-spectrum licences — a quarter of one per cent of the register — carry 78% of all
-device assignments. And 43% of the register's site records have no equipment on
-them at all.
+licensee is a fixed-broadband company. Government, emergency services, councils
+and volunteers hold about 29% of the licences and 6.5% of the registered device
+rows. 398 spectrum licences — a quarter of one per cent of the register — carry
+78% of all device rows. And 43% of the register's site records have no equipment
+on them at all.
 
 ## Who is this for?
 
@@ -84,7 +84,7 @@ site is not endorsed by the ACMA. See [ADDITIONAL-TERMS.md](./ADDITIONAL-TERMS.m
 - **Runtime:** Vanilla TypeScript, no framework
 - **Build:** Vite 6
 - **Testing:** Vitest (85 tests)
-- **Maps:** Leaflet 1.9 with a hand-rolled canvas point layer for 71,451 sites
+- **Maps:** Leaflet 1.9 with a hand-rolled canvas point layer for ~71,000 sites
 - **Hosting:** GitHub Pages (static, no backend)
 - **Data:** a monthly GitHub Actions pipeline with a dependency-free CSV parser
   and ZIP reader
@@ -130,9 +130,9 @@ Two things make the aggregation more than a group-by. The register's unit is a
 Telecommunications Authority seven, Airservices Australia six — so everything is
 keyed on a merged entity id, and one id space is asserted across every payload.
 And the ACMA's licence forbids publishing a natural person's information, so
-3,353 licensees are suppressed along with 1,496 sites whose every device belongs
-to an individual, because the register's site names are frequently street
-addresses recorded to ten-metre accuracy.
+about 3,500 licensees are suppressed along with the ~1,600 sites whose every
+device belongs to an individual, because the register's site names are frequently
+street addresses recorded to ten-metre accuracy.
 
 The pipeline fails the build rather than publishing a wrong number. Thirty-odd
 gates each recompute a figure from the source CSVs and compare it with what the

@@ -30,7 +30,7 @@ export interface Sa4Stat {
 
 export interface BandRow {
   name: string; lo: number; hi: number | null; use: string;
-  rows: number; tx: number; licences: number; entities: number;
+  rows: number; tx: number; assignments: number; licences: number; entities: number;
   byClass: Record<string, number>; topHolders: [number, number][];
 }
 
